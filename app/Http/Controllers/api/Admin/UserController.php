@@ -13,7 +13,8 @@ class UserController extends Controller
 
     public function __construct()
     {
-        $this->middleware('can:isAdmin,App\Models\User')->only('index');
+        $this->middleware('can:isAdmin,App\Models\User')->only(['index', 'show', 'update']);
+        $this->middleware('can:belongsToSameCompany,user')->only(['show', 'update']);
     }
     /**
      * Display a listing of the resource.
@@ -50,15 +51,23 @@ class UserController extends Controller
      */
     public function show(Request $request,  User $user)
     {
-        //
+
+        return new UserResource($user);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, User $user)
     {
-        //
+        $validate =  $request->validate([
+            "roles" => "required|array",
+            "roles.*" => "required|string|exists:roles,code"
+        ]);
+
+        $user->roles()->sync($validate['roles']);
+        $user->save(); 
+        return new UserResource($user);
     }
 
     /**
@@ -67,5 +76,7 @@ class UserController extends Controller
     public function destroy(string $id)
     {
         //
-    }
+    }    
+
+    
 }
