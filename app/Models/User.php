@@ -99,6 +99,6 @@ class User extends Authenticatable implements MustVerifyEmailContract
      */
     public function roles(): BelongsToMany
     {
-        return $this->belongsToMany(Role::class)->withTimestamps();
+        return $this->belongsToMany(Role::class, 'role_user', 'user_id', 'role_id')->withTimestamps();
     }
 }

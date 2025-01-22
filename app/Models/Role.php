@@ -20,13 +20,16 @@ class Role extends Model
         self::CODE_MAN_ROLE => self::NAME_MAN_ROLE,
     ];
 
+    protected $primaryKey = 'code';
+    public $incrementing = false;
+    protected $keyType = 'string';
     /**
      * The users that belong to the Role.
      * @return BelongsToMany
      */
     public function users(): BelongsToMany
     {
-        return $this->belongsToMany(User::class)->withTimestamps();
+        return $this->belongsToMany(User::class, 'role_user', 'user_id', 'role_id')->withTimestamps();
     }
 
     /**
