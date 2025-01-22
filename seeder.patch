@@ -1,0 +1,142 @@
+diff --git a/app/Models/Company.php b/app/Models/Company.php
+index 7f3c728..fcfcb82 100644
+--- a/app/Models/Company.php
++++ b/app/Models/Company.php
+@@ -2,11 +2,13 @@
+ 
+ namespace App\Models;
+ 
++use Illuminate\Database\Eloquent\Factories\HasFactory;
+ use Illuminate\Database\Eloquent\Model;
+ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+ 
+ class Company extends Model
+ {
++    use HasFactory;
+     protected $table = 'companies';
+ 
+     /**
+diff --git a/database/factories/CompanyFactory.php b/database/factories/CompanyFactory.php
+new file mode 100644
+index 0000000..de0995e
+--- /dev/null
++++ b/database/factories/CompanyFactory.php
+@@ -0,0 +1,24 @@
++<?php
++
++namespace Database\Factories;
++
++use Illuminate\Database\Eloquent\Factories\Factory;
++
++/**
++ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Company>
++ */
++class CompanyFactory extends Factory
++{
++    /**
++     * Define the model's default state.
++     *
++     * @return array<string, mixed>
++     */
++    public function definition(): array
++    {
++        return [
++            'name' => $this->faker->company(),
++            'commercial_name' => $this->faker->companySuffix()
++        ];
++    }
++}
+diff --git a/database/factories/UserFactory.php b/database/factories/UserFactory.php
+index 584104c..4ee74c2 100644
+--- a/database/factories/UserFactory.php
++++ b/database/factories/UserFactory.php
+@@ -24,9 +24,9 @@ class UserFactory extends Factory
+     public function definition(): array
+     {
+         return [
+-            'name' => fake()->name(),
+-            'email' => fake()->unique()->safeEmail(),
+-            'email_verified_at' => now(),
++            'firstname' => $this->faker->firstName(),
++            'lastname' => $this->faker->lastName(),
++            'email' => $this->faker->unique()->safeEmail(),
+             'password' => static::$password ??= Hash::make('password'),
+             'remember_token' => Str::random(10),
+         ];
+@@ -37,7 +37,7 @@ public function definition(): array
+      */
+     public function unverified(): static
+     {
+-        return $this->state(fn (array $attributes) => [
++        return $this->state(fn(array $attributes) => [
+             'email_verified_at' => null,
+         ]);
+     }
+diff --git a/database/seeders/DatabaseSeeder.php b/database/seeders/DatabaseSeeder.php
+index d01a0ef..a7bb293 100644
+--- a/database/seeders/DatabaseSeeder.php
++++ b/database/seeders/DatabaseSeeder.php
+@@ -2,7 +2,6 @@
+ 
+ namespace Database\Seeders;
+ 
+-use App\Models\User;
+ // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+ use Illuminate\Database\Seeder;
+ 
+@@ -13,11 +12,9 @@ class DatabaseSeeder extends Seeder
+      */
+     public function run(): void
+     {
+-        // User::factory(10)->create();
+-
+-        User::factory()->create([
+-            'name' => 'Test User',
+-            'email' => 'test@example.com',
++        $this->call([
++            RoleSeeder::class,
++            UserSeeder::class
+         ]);
+     }
+ }
+diff --git a/database/seeders/RoleSeeder.php b/database/seeders/RoleSeeder.php
+index c39e814..ca37e64 100644
+--- a/database/seeders/RoleSeeder.php
++++ b/database/seeders/RoleSeeder.php
+@@ -18,7 +18,6 @@ public function run(): void
+                 'name' => $name,
+             ];
+         }
+-        Role::truncate();
+         Role::insert($roles);
+     }
+ }
+diff --git a/database/seeders/UserSeeder.php b/database/seeders/UserSeeder.php
+new file mode 100644
+index 0000000..f0efb05
+--- /dev/null
++++ b/database/seeders/UserSeeder.php
+@@ -0,0 +1,23 @@
++<?php
++
++namespace Database\Seeders;
++
++use App\Models\Company;
++use App\Models\Role;
++use App\Models\User;
++use Illuminate\Database\Seeder;
++
++class UserSeeder extends Seeder
++{
++    /**
++     * Run the database seeds.
++     */
++    public function run(): void
++    {
++        User::factory(3)->create()->each(function ($user) {
++            $company = Company::factory()->create();
++            $user->companies()->attach($company->id);
++            Role::attachRole($user, Role::CODE_ADM_ROLE);
++        });
++    }
++}

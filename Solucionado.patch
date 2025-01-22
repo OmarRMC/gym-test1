@@ -1,0 +1,220 @@
+diff --git a/app/Http/Controllers/Controller.php b/app/Http/Controllers/Controller.php
+index 8677cd5..e1fc5de 100644
+--- a/app/Http/Controllers/Controller.php
++++ b/app/Http/Controllers/Controller.php
+@@ -2,7 +2,9 @@
+ 
+ namespace App\Http\Controllers;
+ 
+-abstract class Controller
++use Illuminate\Routing\Controller as BaseController;
++
++abstract class Controller extends BaseController
+ {
+     //
+ }
+diff --git a/app/Http/Controllers/api/Admin/UserController.php b/app/Http/Controllers/api/Admin/UserController.php
+new file mode 100644
+index 0000000..f5af92c
+--- /dev/null
++++ b/app/Http/Controllers/api/Admin/UserController.php
+@@ -0,0 +1,62 @@
++<?php
++
++namespace App\Http\Controllers\Api\Admin;
++
++use App\Http\Controllers\Controller;
++use App\Http\Resources\UserResource;
++use App\Models\User;
++use Illuminate\Http\Request;
++use Illuminate\Support\Facades\Log;
++
++class UserController extends Controller
++{
++
++    public function __construct()
++    {
++        $this->middleware('can:isAdmin,App\Models\User')->only('index');
++    }
++    /**
++     * Display a listing of the resource.
++     */
++    public function index(Request $request)
++    {
++        $user = $request->user();
++        $companyIds = $user->companies()->pluck('companies.id');
++        $users = User::whereHas('companies', function ($query) use ($companyIds) {
++            $query->whereIn('companies.id', $companyIds);
++        })->get();
++        return  UserResource::collection($users);
++    }
++
++    /**
++     * Store a newly created resource in storage.
++     */
++    public function store(Request $request)
++    {
++        //
++    }
++
++    /**
++     * Display the specified resource.
++     */
++    public function show(Request $request,  User $user)
++    {
++        return new UserResource($user);
++    }
++
++    /**
++     * Update the specified resource in storage.
++     */
++    public function update(Request $request, string $id)
++    {
++        //
++    }
++
++    /**
++     * Remove the specified resource from storage.
++     */
++    public function destroy(string $id)
++    {
++        //
++    }
++}
+diff --git a/app/Http/Resources/RoleResource.php b/app/Http/Resources/RoleResource.php
+new file mode 100644
+index 0000000..42bfe52
+--- /dev/null
++++ b/app/Http/Resources/RoleResource.php
+@@ -0,0 +1,22 @@
++<?php
++
++namespace App\Http\Resources;
++
++use Illuminate\Http\Request;
++use Illuminate\Http\Resources\Json\JsonResource;
++
++class RoleResource extends JsonResource
++{
++    /**
++     * Transform the resource into an array.
++     *
++     * @return array<string, mixed>
++     */
++    public function toArray(Request $request): array
++    {
++        return [
++            'code' => $this->code,
++            'name' => $this->name,
++        ];
++    }
++}
+diff --git a/app/Http/Resources/UserResource.php b/app/Http/Resources/UserResource.php
+index de97dff..6e7e373 100644
+--- a/app/Http/Resources/UserResource.php
++++ b/app/Http/Resources/UserResource.php
+@@ -19,6 +19,7 @@ public function toArray(Request $request): array
+             'fistname' => $this->firstname,
+             'lastname' => $this->lastname,
+             'email' => $this->email,
++            //"roles" => new RoleResource($this->roles),
+         ];
+     }
+ }
+diff --git a/app/Models/Role.php b/app/Models/Role.php
+index 3bf38e0..630da3e 100644
+--- a/app/Models/Role.php
++++ b/app/Models/Role.php
+@@ -20,13 +20,16 @@ class Role extends Model
+         self::CODE_MAN_ROLE => self::NAME_MAN_ROLE,
+     ];
+ 
++    protected $primaryKey = 'code';
++    public $incrementing = false;
++    protected $keyType = 'string';
+     /**
+      * The users that belong to the Role.
+      * @return BelongsToMany
+      */
+     public function users(): BelongsToMany
+     {
+-        return $this->belongsToMany(User::class)->withTimestamps();
++        return $this->belongsToMany(User::class, 'role_user', 'user_id', 'role_id')->withTimestamps();
+     }
+ 
+     /**
+diff --git a/app/Models/User.php b/app/Models/User.php
+index 6b58fce..3e6fa16 100644
+--- a/app/Models/User.php
++++ b/app/Models/User.php
+@@ -99,6 +99,6 @@ public function companies(): BelongsToMany
+      */
+     public function roles(): BelongsToMany
+     {
+-        return $this->belongsToMany(Role::class)->withTimestamps();
++        return $this->belongsToMany(Role::class, 'role_user', 'user_id', 'role_id')->withTimestamps();
+     }
+ }
+diff --git a/app/Policies/UserPolicy.php b/app/Policies/UserPolicy.php
+new file mode 100644
+index 0000000..2ba266d
+--- /dev/null
++++ b/app/Policies/UserPolicy.php
+@@ -0,0 +1,17 @@
++<?php
++
++namespace App\Policies;
++
++use App\Models\Role;
++use App\Models\User;
++use Illuminate\Support\Facades\Log;
++
++
++class UserPolicy
++{
++    public function isAdmin(User $user): bool
++    {
++        LOG::info($user->id);
++        return $user->roles()->where('code', Role::CODE_ADM_ROLE)->exists();
++    }
++}
+diff --git a/app/Providers/AppServiceProvider.php b/app/Providers/AppServiceProvider.php
+index 452e6b6..d4ab6b0 100644
+--- a/app/Providers/AppServiceProvider.php
++++ b/app/Providers/AppServiceProvider.php
+@@ -2,10 +2,15 @@
+ 
+ namespace App\Providers;
+ 
++use App\Models\User;
++use App\Policies\UserPolicy;
+ use Illuminate\Support\ServiceProvider;
+ 
+ class AppServiceProvider extends ServiceProvider
+ {
++    protected $policies = [
++        User::class => UserPolicy::class,
++    ];
+     /**
+      * Register any application services.
+      */
+diff --git a/routes/api.php b/routes/api.php
+index 836ed92..fb924fa 100644
+--- a/routes/api.php
++++ b/routes/api.php
+@@ -1,5 +1,6 @@
+ <?php
+ 
++use App\Http\Controllers\Api\Admin\UserController;
+ use App\Http\Controllers\Api\AuthController;
+ use Illuminate\Http\Request;
+ use Illuminate\Support\Facades\Route;
+@@ -13,3 +14,8 @@
+     Route::get('/verify-email', [AuthController::class, 'validateEmail'])->name('verification.email');
+     Route::post('/login', [AuthController::class, 'login']);
+ });
++
++Route::middleware(['auth:sanctum'])->group(function () {
++    Route::get("/user", [UserController::class, 'index']);
++    Route::get("/user/:id", [UserController::class, 'show']);
++});
