@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\InvitationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -17,4 +18,6 @@ Route::group([], function () {
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::apiResource("/user", UserController::class);   
+    Route::post("/invite/create", [InvitationController::class, 'sendEmailInvitation']);   
 });
+Route::post("/invite/register", [InvitationController::class, 'registerUser']);   
