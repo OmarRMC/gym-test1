@@ -16,7 +16,8 @@ class UserController extends Controller
 
     public function __construct()
     {
-        $this->middleware('can:isAdmin,App\Models\User')->only(['index', 'show', 'update']);
+        $this->middleware('can:isAdmin')->only(['index', 'show', 'update']);
+        //$this->middleware('can:isAdmin,App\Models\User')->only(['index', 'show', 'update']);
         $this->middleware('can:belongsToSameCompany,user')->only(['show', 'update']);
     }
     /**
